@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo de Cartas Online</title>
+    <style>
+        /* Estilos básicos */
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #loginForm, #gameArea { margin-top: 20px; }
+        .card { display: inline-block; width: 50px; height: 75px; border: 1px solid black; margin: 5px; }
+        #logoutButton { position: absolute; top: 10px; right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Jogo de Cartas Online</h1>
+    
+    <div id="loginForm">
+        <input type="text" id="username" placeholder="Nome de usuário">
+        <input type="password" id="password" placeholder="Senha">
+        <button onclick="login()">Entrar</button>
+    </div>
+
+    <div id="gameArea" style="display: none;">
+        <button id="logoutButton" onclick="logout()">Sair</button>
+        <h2>Suas cartas:</h2>
+        <div id="playerCards"></div>
+        <button onclick="playCard()">Jogar carta</button>
+        <h2>Mesa:</h2>
+        <div id="tableCards"></div>
+        <p id="message"></p>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let playerCards = [];
+
+        // Adiciona event listeners para o login com a tecla Enter
+        document.getElementById('username').addEventListener('keypress', loginOnEnter);
+        document.getElementById('password').addEventListener('keypress', loginOnEnter);
+
+        function loginOnEnter(event) {
+            if (event.key === 'Enter') {
+                login();
+            }
+        }
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            socket.emit('login', { username, password });
+        }
+
+        function logout() {
+            socket.emit('logout');
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('gameArea').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            playerCards = [];
+            document.getElementById('playerCards').innerHTML = '';
+            document.getElementById('tableCards').innerHTML = '';
+            document.getElementById('message').textContent = '';
+        }
+
+        socket.on('loginResult', (result) => {
+            if (result.success) {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('gameArea').style.display = 'block';
+                alert('Login bem-sucedido! Aguardando outro jogador...');
+            } else {
+                alert('Login falhou. Tente novamente.');
+            }
+        });
+
+        socket.on('gameStart', (cards) => {
+            playerCards = cards;
+            updatePlayerCards();
+            document.getElementById('message').textContent = 'Jogo iniciado! Sua vez de jogar.';
+        });
+
+        function updatePlayerCards() {
+            const playerCardsDiv = document.getElementById('playerCards');
+            playerCardsDiv.innerHTML = '';
+            playerCards.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'card';
+                cardElement.textContent = card;
+                playerCardsDiv.appendChild(cardElement);
+            });
+        }
+
+        function playCard() {
+            if (playerCards.length > 0) {
+                const card = playerCards.pop();
+                socket.emit('playCard', card);
+                updatePlayerCards();
+            }
+        }
+
+        socket.on('cardPlayed', (card) => {
+            const tableCardsDiv = document.getElementById('tableCards');
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card';
+            cardElement.textContent = card;
+            tableCardsDiv.appendChild(cardElement);
+        });
+
+        socket.on('turnChange', () => {
+            document.getElementById('message').textContent = 'Sua vez de jogar!';
+        });
+
+        socket.on('gameOver', (winner) => {
+            alert(`Jogo terminado! O vencedor é: ${winner}`);
+        });
+    </script>
+</body>
+</html>
